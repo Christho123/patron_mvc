@@ -95,6 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <label for="password">Contrasena</label>
                     <div class="input-wrapper">
                         <input type="password" id="password" name="password" placeholder="Minimo 6 caracteres" required>
+                        <progress id="strength-bar" max="4"></progress>
+                        <script src="/Assets/js/Register/passwordStrength.js"></script>
                         <i class="fas fa-lock"></i>
                     </div>
                     <div class="password-strength" id="strengthBars">
@@ -116,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <button type="submit" class="btn-primary">
                     Crear Cuenta
                 </button>
+                    
             </form>
 
             <div class="form-footer">
@@ -126,5 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
 
     <script src="../../Assets/js/Register/Register.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 </html>

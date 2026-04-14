@@ -76,6 +76,17 @@ $error = $auth->login();
                 <button type="submit" class="btn-primary">
                     Acceder
                 </button>
+                <hr style="margin:20px 0;">
+
+                <div style="text-align:center;">
+                    <video id="video" width="260" autoplay style="border-radius:10px;"></video>
+
+                    <br><br>
+
+                    <button type="button" class="btn-primary" onclick="loginFace()">
+                        <i class="fas fa-face-smile"></i> Iniciar con rostro
+                    </button>
+                </div>
             </form>
 
             <div class="form-footer">
@@ -84,5 +95,8 @@ $error = $auth->login();
         </main>
 
     </div>
+    <script defer src="/patron_mvc/Assets/js/Login/Login.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </body>
 </html>

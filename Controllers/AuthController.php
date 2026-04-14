@@ -1,4 +1,5 @@
 <?php
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
@@ -6,11 +7,22 @@ require_once __DIR__ . '/../Models/User/User.php';
 require_once __DIR__ . '/../libs/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/../libs/PHPMailer/src/SMTP.php';
 require_once __DIR__ . '/../libs/PHPMailer/src/Exception.php';
+require_once __DIR__ . '/../Models/User/Duplicate.php';
+require_once __DIR__ . '/../Config/Database.php';
 
 class AuthController {
 
+    // 🔥 función para evitar error de sesión duplicada
+    private function startSession() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+    }
+
     public function login() {
-        session_start();
+        $this->startSession();
+
+        #$this->deleteUnverifiedUsers();
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
@@ -30,10 +42,8 @@ class AuthController {
 
                 $_SESSION['temp_user_id'] = $user['id'];
 
-                // ✅ ENVIAR OTP POR EMAIL
                 $this->enviarOTP($user['email'], $otp);
 
-                // ✅ REDIRIGIR
                 header("Location: /patron_mvc/Views/verificar_otp/verificar_otp.php");
                 exit;
 
@@ -43,61 +53,64 @@ class AuthController {
         }
     }
 
-public function register() {
+    public function register() {
 
-    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
-        $userModel = new User();
+            $pdo = getConnection();
+            $userModel = new User();
 
-        $usuario = $_POST['usuario'];
-        $email = $_POST['email'];
-        $password = $_POST['password'];
-        $confirm_password = $_POST['confirm_password'];
+            $usuario = $_POST['usuario'];
+            $email = $_POST['email'];
+            $password = $_POST['password'];
+            $confirm_password = $_POST['confirm_password'];
 
-        if ($password !== $confirm_password) {
-            return "error_match";
-        }
-
-        $password_hash = password_hash($password, PASSWORD_BCRYPT);
-
-        try {
-            if ($userModel->create($usuario, $email, $password_hash)) {
-
-                // 🔍 Obtener usuario recién creado
-                $user = $userModel->findByUsername($usuario);
-
-                // 🔐 Generar OTP
-                $otp = random_int(100000, 999999);
-                $expiracion = date("Y-m-d H:i:s", strtotime('+5 minutes'));
-
-                $userModel->saveOTP($user['id'], $otp, $expiracion);
-
-                // 🧠 Guardar sesión temporal
-                session_start();
-                $_SESSION['temp_user_id'] = $user['id'];
-
-                // 📩 Enviar OTP
-                $this->enviarOTP($email, $otp);
-                $this->notificarNuevoUsuario($usuario, $email);
-
-                // 🔁 REDIRIGIR (ESTO ES LO QUE TE FALTABA)
-                header("Location: /patron_mvc/Views/verificar_otp/verificar_otp.php");
-                exit;
+            if ($password !== $confirm_password) {
+                return "error_match";
             }
 
-        } catch (PDOException $e) {
+            $password_hash = password_hash($password, PASSWORD_BCRYPT);
 
-            if ($e->getCode() == 23000) {
+            // 🔍 VALIDAR DUPLICADO
+            $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE email = ? OR usuario = ?");
+            $stmt->execute([$email, $usuario]);
+
+            if ($stmt->fetch()) {
+
+                $duplicate = new Duplicate();
+                $duplicate->save($email, $_SERVER['REMOTE_ADDR']);
+
                 return "error_dup";
-            } else {
-                return "error_db";
+            }
+
+            try {
+                if ($userModel->create($usuario, $email, $password_hash)) {
+
+                    $user = $userModel->findByUsername($usuario);
+
+                    $otp = random_int(100000, 999999);
+                    $expiracion = date("Y-m-d H:i:s", strtotime('+5 minutes'));
+
+                    $userModel->saveOTP($user['id'], $otp, $expiracion);
+
+                    $this->startSession();
+                    $_SESSION['temp_user_id'] = $user['id'];
+
+                    $this->enviarOTP($email, $otp);
+                    $this->notificarNuevoUsuario($usuario, $email);
+
+                    header("Location: /patron_mvc/Views/verificar_otp/verificar_otp.php");
+                    exit;
+                }
+
+            } catch (PDOException $e) {
+                return ($e->getCode() == 23000) ? "error_dup" : "error_db";
             }
         }
     }
-}
 
     public function verifyOTP() {
-        session_start();
+        $this->startSession();
 
         if (!isset($_SESSION['temp_user_id'])) {
             header("Location: /patron_mvc/Views/Login/Login.php");
@@ -114,11 +127,22 @@ public function register() {
             $user = $userModel->verifyOTP($id, $otp_ingresado);
 
             if ($user) {
-                $userModel->clearOTP($id);
+
+                $pdo = getConnection();
+
+                $stmt = $pdo->prepare("
+                    UPDATE usuarios 
+                    SET verified = 1,
+                        estado = 1,
+                        otp_code = NULL,
+                        otp_expiracion = NULL
+                    WHERE id = ?
+                ");
+                $stmt->execute([$id]);
 
                 $_SESSION['user_id'] = $id;
 
-                header("Location: /patron_mvc/Dashboard.php");
+                header("Location: /patron_mvc/index.php?route=dashboard");
                 exit;
             } else {
                 return "Codigo invalido o expirado.";
@@ -126,20 +150,15 @@ public function register() {
         }
     }
 
-    // 🔥 FUNCIÓN PARA ENVIAR CORREO
     private function enviarOTP($correo, $otp) {
-
         $mail = new PHPMailer(true);
 
         try {
             $mail->isSMTP();
             $mail->Host = 'smtp.gmail.com';
             $mail->SMTPAuth = true;
-
-            // ⚠️ CAMBIA ESTO
             $mail->Username = 'qrqdsq45@gmail.com';
             $mail->Password = 'ifgf hqab djtf afus';
-
             $mail->SMTPSecure = 'tls';
             $mail->Port = 587;
 
@@ -150,9 +169,8 @@ public function register() {
             $mail->Subject = 'Codigo OTP - SecureAuth';
             $mail->Body = "
                 <h2>Verificacion de seguridad</h2>
-                <p>Tu codigo OTP es:</p>
                 <h1 style='color:#10b981;'>$otp</h1>
-                <p>Este codigo expira en 5 minutos.</p>
+                <p>Expira en 5 minutos</p>
             ";
 
             $mail->send();
@@ -161,50 +179,82 @@ public function register() {
             error_log("Error enviando correo: " . $mail->ErrorInfo);
         }
     }
+
     private function notificarNuevoUsuario($usuario, $email) {
+        $mail = new PHPMailer(true);
 
-    $mail = new PHPMailer(true);
+        date_default_timezone_set('America/Lima');
+        $fecha = date("d/m/Y");
+        $hora = date("H:i:s");
 
-    // 🕒 Obtener fecha y hora actual
-    date_default_timezone_set('America/Lima'); // importante para Perú
-    $fecha = date("d/m/Y");
-    $hora = date("H:i:s");
+        try {
+            $mail->isSMTP();
+            $mail->Host = 'smtp.gmail.com';
+            $mail->SMTPAuth = true;
+            $mail->Username = 'qrqdsq45@gmail.com';
+            $mail->Password = 'ifgf hqab djtf afus';
+            $mail->SMTPSecure = 'tls';
+            $mail->Port = 587;
 
-    try {
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->SMTPAuth = true;
+            $mail->setFrom('qrqdsq45@gmail.com', 'SecureAuth');
+            $mail->addAddress('qrqdsq45@gmail.com');
 
-        $mail->Username = 'qrqdsq45@gmail.com';
-        $mail->Password = 'ifgf hqab djtf afus';
+            $mail->isHTML(true);
+            $mail->Subject = '🆕 Nuevo usuario registrado';
+            $mail->Body = "
+                <h2>Nuevo usuario registrado</h2>
+                <p><b>Usuario:</b> $usuario</p>
+                <p><b>Correo:</b> $email</p>
+                <p><b>Fecha:</b> $fecha</p>
+                <p><b>Hora:</b> $hora</p>
+            ";
 
-        $mail->SMTPSecure = 'tls';
-        $mail->Port = 587;
+            $mail->send();
 
-        $mail->setFrom('qrqdsq45@gmail.com', 'SecureAuth');
-
-        // 📩 TE LLEGA A TI
-        $mail->addAddress('qrqdsq45@gmail.com');
-        $mail->addAddress('isistemas2022@gmail.com'); // adicional
-
-        $mail->isHTML(true);
-        $mail->Subject = '🆕 Nuevo usuario registrado';
-
-        $mail->Body = "
-            <h2>Nuevo usuario registrado</h2>
-            <p><b>Usuario:</b> $usuario</p>
-            <p><b>Correo:</b> $email</p>
-            <p><b>Fecha:</b> $fecha</p>
-            <p><b>Hora:</b> $hora</p>
-            <hr>
-            <small>SecureAuth System</small>
-        ";
-
-        $mail->send();
-
-    } catch (Exception $e) {
-        error_log("Error notificando admin: " . $mail->ErrorInfo);
+        } catch (Exception $e) {
+            error_log("Error notificando admin: " . $mail->ErrorInfo);
+        }
     }
+
+    public function deleteUnverifiedUsers() {
+        $pdo = getConnection();
+
+        $pdo->exec("
+            DELETE FROM user_faces 
+            WHERE user_id IN (
+                SELECT id FROM usuarios 
+                WHERE verified = 0 
+                AND created_at < NOW() - INTERVAL 5 MINUTE
+            )
+        ");
+
+        $stmt = $pdo->prepare("
+            DELETE FROM usuarios 
+            WHERE verified = 0 
+            AND created_at < NOW() - INTERVAL 5 MINUTE
+        ");
+
+        $stmt->execute();
+    }
+
+    public function listUsers() {
+
+    $userModel = new User();
+
+    // 🔥 limpieza automática antes de listar
+    $userModel->expireOtps();
+
+    return $userModel->getAllUsers();
 }
 
+    public function logout() {
+        $this->startSession();
+
+        session_unset();
+        session_destroy();
+
+        header("Location: /patron_mvc/index.php");
+        exit;
+    }
+    
 }

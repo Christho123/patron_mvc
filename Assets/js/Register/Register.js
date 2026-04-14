@@ -16,3 +16,13 @@
                     : 'rgba(100,116,139,0.2)';
             });
         });
+        function showToast(msg){
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: msg,
+        showConfirmButton: false,
+        timer: 3000
+    });
+}
