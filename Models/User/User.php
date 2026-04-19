@@ -6,18 +6,18 @@ class User {
     private $pdo;
 
     public function __construct() {
-        // 🔥 FIX CLAVE: obtener conexión correctamente
+        // FIX CLAVE: obtener conexión correctamente
         $this->pdo = getConnection();
     }
 
-    // 🔍 Buscar usuario por username
+    // Buscar usuario por username
     public function findByUsername($usuario) {
         $stmt = $this->pdo->prepare("SELECT * FROM usuarios WHERE usuario = ?");
         $stmt->execute([$usuario]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // 🆕 Crear usuario
+    // Crear usuario
     public function create($usuario, $email, $password_hash) {
         $stmt = $this->pdo->prepare("
             INSERT INTO usuarios (usuario, email, password, estado)
@@ -26,7 +26,7 @@ class User {
         return $stmt->execute([$usuario, $email, $password_hash]);
     }
 
-    // 🔐 Guardar OTP
+    // Guardar OTP
     public function saveOTP($id, $otp, $expiracion) {
         $stmt = $this->pdo->prepare("
             UPDATE usuarios 
@@ -36,7 +36,7 @@ class User {
         return $stmt->execute([$otp, $expiracion, $id]);
     }
 
-    // ✅ Verificar OTP
+    // Verificar OTP
     public function verifyOTP($id, $otp) {
         $stmt = $this->pdo->prepare("
             SELECT * FROM usuarios 
@@ -48,7 +48,7 @@ class User {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // 🧹 Limpiar OTP
+    // Limpiar OTP
     public function clearOTP($id) {
         $stmt = $this->pdo->prepare("
             UPDATE usuarios 
@@ -58,7 +58,7 @@ class User {
         return $stmt->execute([$id]);
     }
 
-    // 📋 Listar todos los usuarios
+    // Listar todos los usuarios
 public function getAllUsers() {
     $stmt = $this->pdo->prepare("
         SELECT id, usuario, email, verified, estado, otp_expiracion, created_at

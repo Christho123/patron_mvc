@@ -13,7 +13,7 @@ require_once __DIR__ . '/../Config/Database.php';
 
 class AuthController {
 
-    // 🔥 función para evitar error de sesión duplicada
+    // función para evitar error de sesión duplicada
     private function startSession() {
         if (session_status() === PHP_SESSION_NONE) {
             ini_set('session.gc_maxlifetime', (string)(60 * 60 * 24 * 30));
@@ -97,7 +97,7 @@ class AuthController {
 
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
 
-            // 🔍 VALIDAR DUPLICADO
+            // VALIDAR DUPLICADO
             $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE email = ? OR usuario = ?");
             $stmt->execute([$email, $usuario]);
 

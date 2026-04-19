@@ -1,6 +1,6 @@
    const video = document.getElementById("video");
 
-    // 🔥 INICIAR CÁMARA
+    // INICIAR CÁMARA
     async function iniciarCamara() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -10,7 +10,7 @@
         }
     }
 
-    // 🔥 CARGAR MODELOS
+    // CARGAR MODELOS
     async function cargarModelos() {
         const url = "https://justadudewhohacks.github.io/face-api.js/models";
         await faceapi.nets.tinyFaceDetector.loadFromUri(url);
@@ -18,7 +18,7 @@
         await faceapi.nets.faceRecognitionNet.loadFromUri(url);
     }
 
-    // 🔥 CAPTURAR ROSTRO
+    // CAPTURAR ROSTRO
     async function capturarRostro() {
         const deteccion = await faceapi
             .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
@@ -33,7 +33,7 @@
         return deteccion.descriptor;
     }
 
-    // 🔥 LOGIN CON ROSTRO
+    // LOGIN CON ROSTRO
     async function loginFace() {
         const descriptor = await capturarRostro();
 
@@ -73,7 +73,7 @@
         });
     }
 
-    // 🚀 INICIALIZAR TODO
+    // INICIALIZAR TODO
     window.addEventListener("load", async () => {
 
     if (typeof faceapi === "undefined") {

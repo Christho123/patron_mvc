@@ -27,7 +27,7 @@ class FaceController {
 
     public function registerFace() {
 
-        // 🔥 SIEMPRE JSON limpio
+        // SIEMPRE JSON limpio
         header('Content-Type: application/json; charset=utf-8');
         error_reporting(E_ALL);
         ini_set('display_errors', 0);
@@ -36,9 +36,9 @@ class FaceController {
 
             require_once __DIR__ . '/../Config/Database.php';
             $pdo = getConnection();
-            // 🔥 FIX IMPORTANTE: asegurar conexión PDO
+            // FIX IMPORTANTE: asegurar conexión PDO
 
-            // 🔥 leer JSON correctamente
+            // leer JSON correctamente
             $rawInput = file_get_contents("php://input");
             $data = json_decode($rawInput, true);
 
@@ -69,12 +69,12 @@ class FaceController {
                 return;
             }
 
-            // 🔥 IMPORTANTE: evitar doble encode si ya es JSON string
+            // IMPORTANTE: evitar doble encode si ya es JSON string
             if (is_array($face_data)) {
                 $face_data = json_encode($face_data);
             }
 
-            // 🔥 preparar query
+            // preparar query
             $stmt = $pdo->prepare("INSERT INTO user_faces (user_id, face_data) VALUES (?, ?)");
 
             if (!$stmt) {
@@ -133,7 +133,7 @@ public function loginWithFace() {
             return;
         }
 
-        // 🔥 traer todos los rostros registrados
+        // traer todos los rostros registrados
         $stmt = $pdo->prepare("SELECT user_id, face_data FROM user_faces");
         $stmt->execute();
         $faces = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -142,7 +142,7 @@ public function loginWithFace() {
 
             $storedFace = json_decode($face['face_data'], true);
 
-            // 🔥 calcular distancia
+            // calcular distancia
             $distance = $this->calcularDistancia($storedFace, $inputFace);
 
             if ($distance < 0.5) {

@@ -90,7 +90,7 @@ async function cargarUsuarios() {
         let estado = '';
         let color = '';
 
-        // ⏱ convertir expiración a timestamp
+        // convertir expiración a timestamp
         const expira = u.otp_expiracion ? new Date(u.otp_expiracion).getTime() : null;
 
         const expirado = expira && expira < ahora;
@@ -123,7 +123,7 @@ async function cargarUsuarios() {
 }
 
 // ===============================
-// 🚀 INICIALIZACIÓN GLOBAL
+//     INICIALIZACIÓN GLOBAL
 // ===============================
 document.addEventListener('DOMContentLoaded', () => {
     initAnalyticsChart();
