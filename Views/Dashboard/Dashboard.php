@@ -56,6 +56,17 @@
 
 <?php
 $route = $_GET['route'] ?? 'dashboard';
+$analyticsSummary = $analyticsData['summary'] ?? [
+    'login_success_count' => 0,
+    'register_success_count' => 0,
+    'register_failed_count' => 0
+];
+$analyticsTrend = $analyticsData['trend'] ?? [
+    'labels' => [],
+    'login_success' => [],
+    'register_success' => [],
+    'register_failed' => []
+];
 
 if ($route === 'users') {
 ?>
@@ -116,8 +127,8 @@ if ($route === 'users') {
         <div class="card">
             <div class="kpi-header">
                 <div>
-                    <div class="kpi-value">$12,450</div>
-                    <div class="kpi-label">Ventas</div>
+                    <div class="kpi-value"><?php echo (int)$analyticsSummary['login_success_count']; ?></div>
+                    <div class="kpi-label">Inicios de sesion</div>
                 </div>
             </div>
         </div>
@@ -125,8 +136,17 @@ if ($route === 'users') {
         <div class="card">
             <div class="kpi-header">
                 <div>
-                    <div class="kpi-value">1,250</div>
-                    <div class="kpi-label">Usuarios</div>
+                    <div class="kpi-value"><?php echo (int)$analyticsSummary['register_success_count']; ?></div>
+                    <div class="kpi-label">Registros exitosos</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="kpi-header">
+                <div>
+                    <div class="kpi-value"><?php echo (int)$analyticsSummary['register_failed_count']; ?></div>
+                    <div class="kpi-label">Registros no exitosos</div>
                 </div>
             </div>
         </div>
@@ -134,8 +154,10 @@ if ($route === 'users') {
     </div>
 
     <div class="card">
-        <h3>Gráfico</h3>
-        <canvas id="mainChart"></canvas>
+        <h3>Grafico analitico</h3>
+        <div class="chart-fixed-wrap">
+            <canvas id="mainChart" height="220"></canvas>
+        </div>
     </div>
 
 <?php } ?>
@@ -149,7 +171,7 @@ if ($route === 'users') {
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-    window.DATA_FROM_PHP = <?php echo json_encode($data ?? []); ?>;
+    window.DATA_FROM_PHP = <?php echo json_encode($analyticsTrend ?? [], JSON_UNESCAPED_UNICODE); ?>;
 </script>
 <script src="/patron_mvc/Assets/js/Dashboard/Dashboard.js"></script>
 </body>

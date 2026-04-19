@@ -1,94 +1,86 @@
-// ===============================
-// 📊 CHART SIMPLE (si lo sigues usando)
-// ===============================
-const data = window.DATA_FROM_PHP || [];
-const labels = data.map(d => d.action);
-const values = data.map(d => d.total);
-
-if (document.getElementById('chart')) {
-    new Chart(document.getElementById('chart'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values
-            }]
-        }
-    });
-}
-
-// ===============================
-// 🔔 TOAST
-// ===============================
-function showToast(msg) {
-    Swal.fire({
-        toast: true,
-        position: 'top-end',
-        icon: 'success',
-        title: msg,
-        showConfirmButton: false,
-        timer: 3000
-    });
-}
-
-// ===============================
-// 📊 MOCK DATA (solo si no usas backend en otras partes)
-// ===============================
-const mockData = {
-    analytics: {
-        sales: [1200, 1900, 3000, 500, 2000, 3000, 4500],
-        devices: [55, 30, 15]
-    },
-    users: []
-};
-
-const DATA_FROM_PHP = mockData;
-
-// ===============================
-// 📊 CHARTS
-// ===============================
 let mainChartInstance = null;
-let deviceChartInstance = null;
+let usersIntervalId = null;
 
-function initCharts() {
-    const ctxMain = document.getElementById('mainChart');
-    const ctxDevice = document.getElementById('deviceChart');
+function initAnalyticsChart() {
+    const ctx = document.getElementById('mainChart');
+    if (!ctx) return;
 
-    if (!ctxMain || !ctxDevice) return;
+    const trend = window.DATA_FROM_PHP || {};
+    const labels = Array.isArray(trend.labels) && trend.labels.length
+        ? trend.labels
+        : ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Hoy'];
+    const loginSeries = Array.isArray(trend.login_success) && trend.login_success.length
+        ? trend.login_success
+        : new Array(labels.length).fill(0);
+    const registerSuccessSeries = Array.isArray(trend.register_success) && trend.register_success.length
+        ? trend.register_success
+        : new Array(labels.length).fill(0);
+    const registerFailedSeries = Array.isArray(trend.register_failed) && trend.register_failed.length
+        ? trend.register_failed
+        : new Array(labels.length).fill(0);
 
-    mainChartInstance = new Chart(ctxMain, {
+    if (mainChartInstance) {
+        mainChartInstance.destroy();
+    }
+
+    mainChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul'],
-            datasets: [{
-                label: 'Ingresos ($)',
-                data: DATA_FROM_PHP.analytics.sales,
-                borderColor: '#4f46e5',
-                backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true
-            }]
-        }
-    });
-
-    deviceChartInstance = new Chart(ctxDevice, {
-        type: 'doughnut',
-        data: {
-            labels: ['Escritorio', 'Móvil', 'Tablet'],
-            datasets: [{
-                data: DATA_FROM_PHP.analytics.devices,
-                backgroundColor: ['#4f46e5', '#10b981', '#f59e0b']
-            }]
+            labels,
+            datasets: [
+                {
+                    label: 'Inicios de sesion',
+                    data: loginSeries,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.12)',
+                    borderWidth: 2,
+                    tension: 0.35,
+                    fill: false
+                },
+                {
+                    label: 'Registros exitosos',
+                    data: registerSuccessSeries,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16,185,129,0.12)',
+                    borderWidth: 2,
+                    tension: 0.35,
+                    fill: false
+                },
+                {
+                    label: 'Registros no exitosos',
+                    data: registerFailedSeries,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239,68,68,0.12)',
+                    borderWidth: 2,
+                    tension: 0.35,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            },
+            plugins: {
+                legend: { position: 'top' }
+            }
         }
     });
 }
 
 async function cargarUsuarios() {
+    const tbody = document.querySelector('#usersTable tbody');
+    if (!tbody) return;
+
     const res = await fetch('/patron_mvc/index.php?route=api-users');
     const users = await res.json();
-
-    const tbody = document.querySelector('#usersTable tbody');
     tbody.innerHTML = '';
 
     const ahora = Date.now();
@@ -134,7 +126,13 @@ async function cargarUsuarios() {
 // 🚀 INICIALIZACIÓN GLOBAL
 // ===============================
 document.addEventListener('DOMContentLoaded', () => {
-    cargarUsuarios();
-
-    setInterval(cargarUsuarios, 3000); // cada 3 segundos
+    initAnalyticsChart();
+    const hasUsersTable = !!document.querySelector('#usersTable tbody');
+    if (hasUsersTable) {
+        cargarUsuarios();
+        if (usersIntervalId) {
+            clearInterval(usersIntervalId);
+        }
+        usersIntervalId = setInterval(cargarUsuarios, 3000); // solo en vista usuarios
+    }
 });

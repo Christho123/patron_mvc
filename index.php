@@ -20,17 +20,19 @@ if ($route === 'face-login') {
     exit;
 }
 
-// 🔥 DASHBOARD 👈 AGREGA ESTO
-if ($route === 'dashboard') {
-    require_once __DIR__ . '/Views/Dashboard/Dashboard.php';
+if ($route === 'verify-face-otp') {
+    $controller = new FaceController();
+    $controller->verifyFaceAfterOtp();
     exit;
 }
+
 if ($route === 'dashboard' || $route === 'users') {
 
     require_once __DIR__ . '/Controllers/AuthController.php';
 
     $auth = new AuthController();
     $users = $auth->listUsers();
+    $analyticsData = $auth->getAnalyticsData();
 
     require_once __DIR__ . '/Views/Dashboard/Dashboard.php';
     exit;

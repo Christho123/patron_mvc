@@ -72,24 +72,38 @@ public function getAllUsers() {
 
 public function expireOtps() {
 
-    // 🔴 marcar expirados
-    $stmt = $this->pdo->prepare("
-        UPDATE usuarios 
-        SET estado = 0,
-            otp_code = NULL,
-            otp_expiracion = NULL
-        WHERE verified = 0 
-        AND otp_expiracion IS NOT NULL
-        AND otp_expiracion < NOW()
+    // 1) Limpia rostros de usuarios pendientes ya vencidos para evitar bloqueos FK.
+    $deleteFaces = $this->pdo->prepare("
+        DELETE FROM user_faces
+        WHERE user_id IN (
+            SELECT id
+            FROM usuarios
+            WHERE verified = 0
+              AND estado = 2
+              AND (
+                    (otp_expiracion IS NOT NULL AND otp_expiracion < NOW())
+                    OR created_at < NOW() - INTERVAL 5 MINUTE
+                  )
+        )
     ");
-    $stmt->execute();
+    $deleteFaces->execute();
 
-    // 🧹 opcional: eliminar expirados
+    // 2) Elimina de usuarios los pendientes vencidos.
     $delete = $this->pdo->prepare("
         DELETE FROM usuarios
-        WHERE estado = 0
-        AND verified = 0
+        WHERE verified = 0
+          AND estado = 2
+          AND (
+                (otp_expiracion IS NOT NULL AND otp_expiracion < NOW())
+                OR created_at < NOW() - INTERVAL 5 MINUTE
+              )
     ");
     $delete->execute();
+}
+
+public function existsById($id) {
+    $stmt = $this->pdo->prepare("SELECT id FROM usuarios WHERE id = ? LIMIT 1");
+    $stmt->execute([$id]);
+    return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
 }
 }

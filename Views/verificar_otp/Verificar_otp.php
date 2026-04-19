@@ -21,28 +21,28 @@ $error = $auth->verifyOTP();
 <body>
 
 <div class="box">       
-    <h3>Verificación OTP</h3>
+    <h3>Verificacion OTP</h3>
+    <p class="hint">Ingresa el codigo de 6 digitos enviado a tu correo. Expira en 5 minutos.</p>
 
     <?php if(isset($error)): ?>
-        <p style="color:red;"><?php echo htmlspecialchars($error); ?></p>
+        <p class="error-msg"><?php echo htmlspecialchars($error); ?></p>
     <?php endif; ?>
 
-    <form method="POST">
-        <input type="text" name="otp" maxlength="6" required>
+    <form method="POST" onsubmit="return submitOTP();">
+        <div class="otp-grid">
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code" required>
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" required>
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" required>
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" required>
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" required>
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" required>
+        </div>
+        <input type="hidden" id="otpHidden" name="otp">
         <button type="submit">Verificar</button>
     </form>
-
-    <video id="video" width="250" autoplay></video>
-
-    <button type="button" onclick="guardarRostro()">Registrar rostro</button>
 </div>
-<script>
-    const USER_ID = <?php echo isset($_SESSION['temp_user_id']) ? $_SESSION['temp_user_id'] : 'null'; ?>;
-</script>
-<!-- LIBRERÍAS -->
- <script src="../../Assets/js/Verificar_otp/Verificar_otp.js"></script>
+<script src="../../Assets/js/Verificar_otp/Verificar_otp.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
 </body>
 </html>

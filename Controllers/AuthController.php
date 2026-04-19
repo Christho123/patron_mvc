@@ -8,6 +8,7 @@ require_once __DIR__ . '/../libs/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/../libs/PHPMailer/src/SMTP.php';
 require_once __DIR__ . '/../libs/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/../Models/User/Duplicate.php';
+require_once __DIR__ . '/../Models/User/Log.php';
 require_once __DIR__ . '/../Config/Database.php';
 
 class AuthController {
@@ -15,18 +16,40 @@ class AuthController {
     // 🔥 función para evitar error de sesión duplicada
     private function startSession() {
         if (session_status() === PHP_SESSION_NONE) {
+            ini_set('session.gc_maxlifetime', (string)(60 * 60 * 24 * 30));
+            session_set_cookie_params([
+                'lifetime' => 60 * 60 * 24 * 30,
+                'path' => '/',
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
             session_start();
+        }
+    }
+
+    private function logAction($userId, $action) {
+        try {
+            $log = new Log();
+            $log->save($userId, $action);
+        } catch (Exception $e) {
+            error_log("No se pudo guardar log: " . $e->getMessage());
         }
     }
 
     public function login() {
         $this->startSession();
 
+        if (isset($_SESSION['user_id'])) {
+            header("Location: /patron_mvc/index.php?route=dashboard");
+            exit;
+        }
+
         #$this->deleteUnverifiedUsers();
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             $userModel = new User();
+            $userModel->expireOtps();
 
             $usuario = $_POST['usuario'];
             $password = $_POST['password'];
@@ -41,10 +64,11 @@ class AuthController {
                 $userModel->saveOTP($user['id'], $otp, $expiracion);
 
                 $_SESSION['temp_user_id'] = $user['id'];
+                $_SESSION['otp_flow'] = 'login';
 
                 $this->enviarOTP($user['email'], $otp);
 
-                header("Location: /patron_mvc/Views/verificar_otp/verificar_otp.php");
+                header("Location: /patron_mvc/Views/verificar_otp/Verificar_otp.php");
                 exit;
 
             } else {
@@ -59,6 +83,7 @@ class AuthController {
 
             $pdo = getConnection();
             $userModel = new User();
+            $userModel->expireOtps();
 
             $usuario = $_POST['usuario'];
             $email = $_POST['email'];
@@ -66,6 +91,7 @@ class AuthController {
             $confirm_password = $_POST['confirm_password'];
 
             if ($password !== $confirm_password) {
+                $this->logAction(null, 'register_failed');
                 return "error_match";
             }
 
@@ -79,6 +105,7 @@ class AuthController {
 
                 $duplicate = new Duplicate();
                 $duplicate->save($email, $_SERVER['REMOTE_ADDR']);
+                $this->logAction(null, 'register_duplicate');
 
                 return "error_dup";
             }
@@ -95,15 +122,17 @@ class AuthController {
 
                     $this->startSession();
                     $_SESSION['temp_user_id'] = $user['id'];
+                    $_SESSION['otp_flow'] = 'register';
 
                     $this->enviarOTP($email, $otp);
                     $this->notificarNuevoUsuario($usuario, $email);
 
-                    header("Location: /patron_mvc/Views/verificar_otp/verificar_otp.php");
+                    header("Location: /patron_mvc/Views/verificar_otp/Verificar_otp.php");
                     exit;
                 }
 
             } catch (PDOException $e) {
+                $this->logAction(null, 'register_failed');
                 return ($e->getCode() == 23000) ? "error_dup" : "error_db";
             }
         }
@@ -120,6 +149,7 @@ class AuthController {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             $userModel = new User();
+            $userModel->expireOtps();
 
             $otp_ingresado = $_POST['otp'];
             $id = $_SESSION['temp_user_id'];
@@ -140,14 +170,41 @@ class AuthController {
                 ");
                 $stmt->execute([$id]);
 
+                // OTP correcto -> segundo factor facial
+                $flow = $_SESSION['otp_flow'] ?? 'login';
+                unset($_SESSION['temp_user_id']);
+                unset($_SESSION['otp_flow']);
+
+                if ($flow === 'register') {
+                    $_SESSION['otp_verified_user_id'] = $id;
+                    header("Location: /patron_mvc/Views/FaceScan/FaceScan.php");
+                    exit;
+                }
+
                 $_SESSION['user_id'] = $id;
+                $this->logAction($id, 'login_success');
 
                 header("Location: /patron_mvc/index.php?route=dashboard");
                 exit;
             } else {
+                // Si ya no existe, fue eliminado por vencimiento del OTP.
+                if (!$userModel->existsById($id)) {
+                    unset($_SESSION['temp_user_id']);
+                    unset($_SESSION['otp_flow']);
+                    $this->logAction($id, 'register_otp_expired');
+                    return "El codigo OTP expiro (5 minutos). Vuelve a registrarte.";
+                }
                 return "Codigo invalido o expirado.";
             }
         }
+    }
+
+    public function getAnalyticsData() {
+        $log = new Log();
+        return [
+            'summary' => $log->getAnalyticsSummary(),
+            'trend' => $log->getAnalyticsTrend(7),
+        ];
     }
 
     private function enviarOTP($correo, $otp) {

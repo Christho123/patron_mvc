@@ -1,7 +1,29 @@
 <?php
 require_once __DIR__ . '/../Models/User/Face.php';
+require_once __DIR__ . '/../Models/User/Log.php';
 
 class FaceController {
+    private function startSession() {
+        if (session_status() === PHP_SESSION_NONE) {
+            ini_set('session.gc_maxlifetime', (string)(60 * 60 * 24 * 30));
+            session_set_cookie_params([
+                'lifetime' => 60 * 60 * 24 * 30,
+                'path' => '/',
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
+            session_start();
+        }
+    }
+
+    private function logAction($userId, $action) {
+        try {
+            $log = new Log();
+            $log->save($userId, $action);
+        } catch (Exception $e) {
+            error_log("No se pudo guardar log: " . $e->getMessage());
+        }
+    }
 
     public function registerFace() {
 
@@ -125,8 +147,9 @@ public function loginWithFace() {
 
             if ($distance < 0.5) {
 
-                session_start();
+                $this->startSession();
                 $_SESSION['user_id'] = $face['user_id'];
+                $this->logAction((int)$face['user_id'], 'login_success');
 
                 echo json_encode([
                     "status" => "success",
@@ -140,6 +163,92 @@ public function loginWithFace() {
             "status" => "fail"
         ]);
 
+    } catch (Exception $e) {
+        echo json_encode([
+            "status" => "error",
+            "message" => $e->getMessage()
+        ]);
+    }
+}
+
+public function verifyFaceAfterOtp() {
+    header('Content-Type: application/json; charset=utf-8');
+    $this->startSession();
+
+    if (!isset($_SESSION['otp_verified_user_id'])) {
+        echo json_encode([
+            "status" => "error",
+            "message" => "Sesion OTP no valida"
+        ]);
+        return;
+    }
+
+    try {
+        require_once __DIR__ . '/../Config/Database.php';
+        $pdo = getConnection();
+
+        $rawInput = file_get_contents("php://input");
+        $data = json_decode($rawInput, true);
+        $inputFace = $data['face_data'] ?? null;
+
+        if (!$inputFace) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "No se recibio rostro"
+            ]);
+            return;
+        }
+
+        $userId = (int)$_SESSION['otp_verified_user_id'];
+
+        $stmt = $pdo->prepare("SELECT face_data FROM user_faces WHERE user_id = ? LIMIT 1");
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Si no tiene rostro, se registra en este paso.
+        if (!$row) {
+            $insert = $pdo->prepare("INSERT INTO user_faces (user_id, face_data) VALUES (?, ?)");
+            $insert->execute([$userId, json_encode($inputFace)]);
+
+            $_SESSION['user_id'] = $userId;
+            unset($_SESSION['otp_verified_user_id']);
+            $this->logAction($userId, 'register_success');
+
+            echo json_encode([
+                "status" => "success",
+                "mode" => "registered"
+            ]);
+            return;
+        }
+
+        $storedFace = json_decode($row['face_data'], true);
+        if (!is_array($storedFace) || count($storedFace) !== count($inputFace)) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Rostro almacenado invalido"
+            ]);
+            return;
+        }
+
+        $distance = $this->calcularDistancia($storedFace, $inputFace);
+
+        if ($distance < 0.5) {
+            $_SESSION['user_id'] = $userId;
+            unset($_SESSION['otp_verified_user_id']);
+            $this->logAction($userId, 'register_success');
+
+            echo json_encode([
+                "status" => "success",
+                "mode" => "verified",
+                "distance" => $distance
+            ]);
+            return;
+        }
+
+        echo json_encode([
+            "status" => "fail",
+            "distance" => $distance
+        ]);
     } catch (Exception $e) {
         echo json_encode([
             "status" => "error",

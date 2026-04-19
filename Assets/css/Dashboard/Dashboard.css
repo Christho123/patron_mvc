@@ -289,6 +289,19 @@
             width: 100%;
         }
 
+        .chart-fixed-wrap {
+            position: relative;
+            height: 220px;
+            max-height: 220px;
+            width: 100%;
+        }
+
+        .chart-fixed-wrap canvas {
+            width: 100% !important;
+            height: 220px !important;
+            display: block;
+        }
+
         /* Users Table */
         .table-container {
             overflow-x: auto;
